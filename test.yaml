@@ -1,0 +1,27 @@
+threads:
+  cannot_be_disabled: []
+  other:
+  - can_interrupt_each_other: false
+    priority: 1
+    threads: [foreground]
+  - can_interrupt_each_other: false
+    priority: 2
+    threads: [backround]
+  get_thread_function: get_thread()
+share_files:
+- extensions: [.c, .h]
+  ipc: ifdef
+  name: rte_test
+  structs:
+  - header: test.h
+    name: Ts_test
+    parsing: none
+    readers: [foreground,background]
+    writer: foreground
+override_files:
+- extensions: .c,.h
+  files: [rte_test.h]
+  name: rte_override
+  structs:
+  - {DID: '1234', name: Ts_test}
+
