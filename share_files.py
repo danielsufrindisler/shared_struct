@@ -1,6 +1,8 @@
 import c_builder
 import yaml
 import generate_struct
+import sys
+
 
 
 class thread:
@@ -105,9 +107,7 @@ def main(name):
         s["all_copies"] = s["read_copies"] + ["write"]
         s["writer_names"] = [t.name for t in s["writer_objs"]]
         s["index_names"] = list(set(s["writer_names"]+ s["all_copies"] + ["newest"]))
-        print s["all_copies"]
-        print s["read_copies"]
-        print s["index_names"]
+
 
         s_objs.append( struct(s["name"], s["header"], False, s["read_copies"], s["read_threads"],
                               s["all_copies"], s["index_names"]))
@@ -115,8 +115,9 @@ def main(name):
     generate_struct.create_files(sf["output_path"], sf["prefix"], sf["c_extension"], sf["h_extension"], \
                                  sf["preamble"], sf["critical_enter"], sf["critical_exit"], sf["includes"], \
                                  json_struct["threads"]["get_thread_function"],threads, s_objs)
-
+    print "files created successfully"
+    return 0
 
 
 if __name__ == '__main__':
-    main("test.yaml")
+    main(sys.argv[1])
