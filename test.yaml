@@ -6,18 +6,21 @@ threads:
     threads: [foreground]
   - can_interrupt_each_other: false
     priority: 2
-    threads: [backround]
+    threads: [background]
   get_thread_function: get_thread()
 share_files:
-- extensions: [.c, .h]
-  ipc: ifdef
-  name: rte_test
+  h_extension: .h
+  c_extension: .c
+  prefix: shs
+  critical_enter: sem_get(&(shs_global_ptr->sem))
+  critical_exit: sem_release(&(shs_global_ptr->sem))
+  includes: [main.h]
   structs:
-  - header: test.h
+  - header: tstest.h
     name: Ts_test
     parsing: none
     readers: [foreground,background]
-    writer: foreground
+    writers: [foreground]
 override_files:
 - extensions: .c,.h
   files: [rte_test.h]
