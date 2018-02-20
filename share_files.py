@@ -2,6 +2,7 @@ import c_builder
 import yaml
 import generate_struct
 import sys
+import os
 
 
 
@@ -50,7 +51,7 @@ class thread:
 
 
 class struct:
-    def __init__(self, name, header, parsing, read_copies, read_threads, all_copies, all_ptrs):
+    def __init__(self, name, type, header, parsing, read_copies, read_threads, all_copies, all_ptrs):
         """
         :str name: name of the thread or process
         :bool exempt: true if this thread is exempt from critical sections / mutexes
@@ -60,6 +61,7 @@ class struct:
         :rtype: thread object
         """
         self.name = name
+        self.type = type
         self.header_which_defines_struct = header
         self.parsing = parsing
         self.read_copies = read_copies
@@ -70,8 +72,10 @@ class struct:
 
 
 def main(name):
+    os.chdir(os.path.dirname(os.path.abspath(name)))
+
     #get the user paramaters
-    with open(name) as f:
+    with open(os.path.basename(name)) as f:
         json_struct = yaml.load(f)
 
 
@@ -109,7 +113,7 @@ def main(name):
         s["index_names"] = list(set(s["writer_names"]+ s["all_copies"] + ["newest"]))
 
 
-        s_objs.append( struct(s["name"], s["header"], False, s["read_copies"], s["read_threads"],
+        s_objs.append( struct(s["name"], s["type"], s["header"], False, s["read_copies"], s["read_threads"],
                               s["all_copies"], s["index_names"]))
 
     generate_struct.create_files(sf["output_path"], sf["prefix"], sf["c_extension"], sf["h_extension"], \

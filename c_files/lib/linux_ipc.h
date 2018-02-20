@@ -11,7 +11,7 @@
 
 
 void* pvtmMmapAlloc (char * mmapFileName, size_t size, char create);
-void sem_get(uint8_t* sem);
-void sem_release(uint8_t* sem);
+void sem_get(volatile uint8_t* sem);
+void sem_release(volatile uint8_t* sem);
 
 #endif

@@ -1,12 +1,12 @@
 threads:
-  cannot_be_disabled: []
+  cannot_be_disabled: []   #add any threads or processes that will not respect the critical sections.  Anything that cannot be disabled must not be able to lose context to any other thread
   other:
-  - can_interrupt_each_other: true
-    priority: 1
-    threads: [foreground,fore2]
+  - can_interrupt_each_other: true  #true or false, add whether threads in this priority level can run in parallel or take the context from each other.
+    priority: 1       #priority number, lower numbers are higher priority than high numbers.  lower numbers can interrupt higher numbers but the reverse is not true.
+    threads: [foreground,fore2,background]  #threads in this priority
   - can_interrupt_each_other: false
     priority: 2
-    threads: [background]
+    threads: [background2]
   get_thread_function: get_thread()
 share_files:
   output_path: ./c_files/output #directory relative to current working directory (or absolute path)
@@ -14,16 +14,17 @@ share_files:
   h_extension: .h  #.h or .hpp
   c_extension: .c  #.c or .cpp
   prefix: shs  #default is shs, all functions will start with this prefix, and all files created will as well
-  critical_enter: sem_get(&(p_shs_struct->sem))
+  critical_enter: sem_get(&(p_shs_struct->sem))  # a function that can protect the critical sections.  On embedded disabling and enabling interrupts is often much lower overhead.
   critical_exit: sem_release(&(p_shs_struct->sem))
-  includes: ['"main.h"', '"linux_ipc.h"']
+  includes: ['"main.h"', '"linux_ipc.h"']  #what to include where critical_enter and critical_exit will be defined.
   structs:
-  - header: tstest.h
-    name: TsTest
-    parsing: none
-    readers: [foreground,background,fore2]
-    writers: [foreground]
-override_files:
+  - header: tstest.h    #header file which defines the struct
+    type: TsTest        #name of the type
+    name: TsTest        #name of the instance (used for accessors)
+    parsing: null       #future expandability for this to parse the structure to allow for reading or overriding specific members.
+    readers: [foreground,background,fore2]  #which threads must read
+    writers: [foreground]  #which thread  (currently only one) can write.
+override_files:   #future proofing for ability to read members of structures or override them possibly through Uniform Diagnostic Services if in the automotive industry.
 - extensions: .c,.h
   files: [rte_test.h]
   name: rte_override

@@ -1,4 +1,5 @@
 #include "linux_ipc.h"
+#include <stdio.h>
 /*
  * pvtmMmapAlloc - creates a memory mapped file area.
  * The return value is a page-aligned memory value, or NULL if there is a failure.
@@ -95,13 +96,35 @@ void* pvtmMmapAlloc (char * mmapFileName, size_t size, char create)
   return retv;  
 }
 
-void sem_get(uint8_t * sem)
+
+
+
+
+
+void sem_get(volatile uint8_t * sem)
 {
-  uint8_t clear_val = 0;
-  while(!__atomic_compare_exchange_n (sem, &clear_val, 1, true, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE));
+  volatile uint8_t clear_val = 0;
+  static uint32_t count = 1;
+  bool result;
+
+  do
+  {
+    clear_val = 0;
+    result = __atomic_compare_exchange_n (sem, &clear_val, 1, false, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE);
+    if (!result)
+    {
+        count++;
+        //if (count % 100 ==0)
+        //{
+//            printf("%d, %d, %p\n",count, *sem, sem);
+//          fflush(stdout);
+        //}
+    }
+  } while (!result);
+
 }
 
-void sem_release(uint8_t *sem)
+void sem_release(volatile uint8_t *sem)
 {
   uint8_t clear_val = 0;
   __atomic_store (sem, &clear_val, __ATOMIC_RELEASE );

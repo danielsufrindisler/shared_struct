@@ -24,7 +24,7 @@ void sleep_rand (void)
 {
    struct timespec tim;
    tim.tv_sec = 0;
-   tim.tv_nsec = rand() % 1000;
+   tim.tv_nsec = rand() % 10;
    nanosleep(&tim , NULL);
 }
 
@@ -47,6 +47,8 @@ int main (int argc, char *argv[])
       sleep_rand();
       TsTest* ptr = shs_TsTest_write();
       ptr->a ++;
+      sleep_rand();
+
       ptr->b =ptr->a;
       shs_TsTest_post();
     }
@@ -64,13 +66,13 @@ int main (int argc, char *argv[])
     uint32_t count=0;
     uint16_t old = 0;
     p_shs_struct = mem1;
-    printf("rte ptr %p",p_shs_struct);
+    printf("rte ptr %p\n",p_shs_struct);
     fflush(stdout);
-    while (1)
+    while (count < 100000)
     {
       sleep_rand();
       TsTest* ptr = shs_TsTest_read();
-      if (count % 100 == 0)
+      if (count % 10000 == 0)
       {
         printf("reading %p  %d \n",ptr,ptr->a);
         fflush(stdout);
@@ -80,9 +82,14 @@ int main (int argc, char *argv[])
         old = ptr->a;
         count++;
       }
-      assert(ptr->a == ptr->b);
+      if (ptr->a != ptr->b)
+      {
+        printf("2: error at %p  %d %d\n",ptr,ptr->a,ptr->b);
+        //assert(ptr->a == ptr->b);
+      }
 
     }
+    return 0;
   }
   if (argv[1][0] == '3')
   {
@@ -97,13 +104,13 @@ int main (int argc, char *argv[])
     uint32_t count=0;
     uint16_t old = 0;
     p_shs_struct = mem1;
-    printf("rte ptr %p",p_shs_struct);
+    printf("rte ptr %p\n",p_shs_struct);
     fflush(stdout);
-    while (1)
+    while (count < 100000)
     {
       sleep_rand();
       TsTest* ptr = shs_TsTest_read();
-      if (count % 100 == 0)
+      if (count % 10000 == 0)
       {
         printf("reading %p  %d \n",ptr,ptr->a);
         fflush(stdout);
@@ -113,9 +120,14 @@ int main (int argc, char *argv[])
         old = ptr->a;
         count++;
       }
-      assert(ptr->a == ptr->b);
+      if (ptr->a != ptr->b)
+      {
+        printf("3: error at %p  %d %d\n",ptr,ptr->a,ptr->b);
+        //assert(ptr->a == ptr->b);
+      }
 
     }
+    return 0;
   }
 
 }
