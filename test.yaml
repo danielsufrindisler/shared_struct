@@ -1,25 +1,27 @@
 threads:
   cannot_be_disabled: []
   other:
-  - can_interrupt_each_other: false
+  - can_interrupt_each_other: true
     priority: 1
-    threads: [foreground]
+    threads: [foreground,fore2]
   - can_interrupt_each_other: false
     priority: 2
     threads: [background]
   get_thread_function: get_thread()
 share_files:
-  h_extension: .h
-  c_extension: .c
-  prefix: shs
-  critical_enter: sem_get(&(shs_global_ptr->sem))
-  critical_exit: sem_release(&(shs_global_ptr->sem))
-  includes: [main.h]
+  output_path: ./c_files/output #directory relative to current working directory (or absolute path)
+  preamble: null #this is a filepath to a text file which can contain copyright for the created file.
+  h_extension: .h  #.h or .hpp
+  c_extension: .c  #.c or .cpp
+  prefix: shs  #default is shs, all functions will start with this prefix, and all files created will as well
+  critical_enter: sem_get(&(p_shs_struct->sem))
+  critical_exit: sem_release(&(p_shs_struct->sem))
+  includes: ['"main.h"', '"linux_ipc.h"']
   structs:
   - header: tstest.h
-    name: Ts_test
+    name: TsTest
     parsing: none
-    readers: [foreground,background]
+    readers: [foreground,background,fore2]
     writers: [foreground]
 override_files:
 - extensions: .c,.h

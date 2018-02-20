@@ -7,13 +7,14 @@
 #include <string.h>
 #include <assert.h>
 #include "linux_ipc.h"
-#include "shared_structs.h"
+#include "shs_shared_file.h"
 
 
-extern TsRte * rte_ptr;
 
-static rte_threads_processes Se_thread;
-rte_threads_processes get_thread(void)
+extern shs_struct * p_shs_struct;
+
+static shs_threads_processes Se_thread;
+shs_threads_processes get_thread(void)
 {
   return Se_thread;
 }
@@ -32,43 +33,43 @@ int main (int argc, char *argv[])
   void * mem1;
   srand(time(NULL));   // should only be called once
 
-  if (argc >= 2)
+  if (argv[1][0] == '1')
   {
-    Se_thread = back1;
-    mem1 = pvtmMmapAlloc ("/dev/shm/rte_1", sizeof(TsRte), true);
+    Se_thread = foreground;
+    mem1 = pvtmMmapAlloc ("/dev/shm/rte_1", sizeof(shs_struct), true);
     printf("creating %s %d",argv[0],argv[1][0]);
     assert (mem1 != NULL);
 
-    rte_ptr = mem1;
-    sem_release(&(rte_ptr->sem));
+    p_shs_struct = mem1;
+    sem_release(&(p_shs_struct->sem));
     while(1)
     {
       sleep_rand();
-      TsTest* ptr = rte_TsTest_write();
+      TsTest* ptr = shs_TsTest_write();
       ptr->a ++;
       ptr->b =ptr->a;
-      rte_TsTest_post();
+      shs_TsTest_post();
     }
   }
-  else
+  if (argv[1][0] == '2')
   {
-    Se_thread = back2;
-    mem1 = pvtmMmapAlloc ("/dev/shm/rte_1", sizeof(TsRte), false);
+    Se_thread = background;
+    mem1 = pvtmMmapAlloc ("/dev/shm/rte_1", sizeof(shs_struct), false);
     if (mem1 == NULL)
     {
       printf ("need to create\n");
-      mem1 = pvtmMmapAlloc ("/dev/shm/rte_1", sizeof(TsRte), true);
+      mem1 = pvtmMmapAlloc ("/dev/shm/rte_1", sizeof(shs_struct), true);
       assert (mem1 != NULL);
     }
     uint32_t count=0;
     uint16_t old = 0;
-    rte_ptr = mem1;
-    printf("rte ptr %p",rte_ptr);
+    p_shs_struct = mem1;
+    printf("rte ptr %p",p_shs_struct);
     fflush(stdout);
     while (1)
     {
       sleep_rand();
-      TsTest* ptr = rte_TsTest_read();
+      TsTest* ptr = shs_TsTest_read();
       if (count % 100 == 0)
       {
         printf("reading %p  %d \n",ptr,ptr->a);
@@ -83,4 +84,38 @@ int main (int argc, char *argv[])
 
     }
   }
+  if (argv[1][0] == '3')
+  {
+    Se_thread = fore2;
+    mem1 = pvtmMmapAlloc ("/dev/shm/rte_1", sizeof(shs_struct), false);
+    if (mem1 == NULL)
+    {
+      printf ("need to create\n");
+      mem1 = pvtmMmapAlloc ("/dev/shm/rte_1", sizeof(shs_struct), true);
+      assert (mem1 != NULL);
+    }
+    uint32_t count=0;
+    uint16_t old = 0;
+    p_shs_struct = mem1;
+    printf("rte ptr %p",p_shs_struct);
+    fflush(stdout);
+    while (1)
+    {
+      sleep_rand();
+      TsTest* ptr = shs_TsTest_read();
+      if (count % 100 == 0)
+      {
+        printf("reading %p  %d \n",ptr,ptr->a);
+        fflush(stdout);
+      }
+      if (ptr->a != old)
+      {
+        old = ptr->a;
+        count++;
+      }
+      assert(ptr->a == ptr->b);
+
+    }
+  }
+
 }
