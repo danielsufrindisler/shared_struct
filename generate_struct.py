@@ -5,22 +5,28 @@ outputpath = r"sample_output"
 indent = "    "
 
 
-def create_files(outputpath, file_prefix, c_ext, h_ext, preamble_file, critical_enter, critical_exit, includes, get_thread, threads, structs):
+def create_files(outputpath, file_prefix, c_ext, h_ext, preamble_file, critical_enter, critical_exit, includes, get_thread, threads, structs, class_style):
 
-    filename = file_prefix + "_shared_file" +  c_ext
-    h_name = file_prefix + "_shared_file" +  h_ext
-    thread_name = file_prefix + "_shared_file_threads" +  h_ext
+    file_prefix += '_'
+    filename = file_prefix + "shared_file" +  c_ext
+    h_name = file_prefix + "shared_file" +  h_ext
+    thread_name = file_prefix + "shared_file_threads" +  h_ext
 
 
-    includes.extend(["<unistd.h>", "<stdbool.h>", "<stdint.h>"])
-    shared_type = file_prefix + "_struct"
+    common_includes = ["<unistd.h>", "<stdbool.h>", "<stdint.h>"] \
+                      + list(set(["\"" + s.header_which_defines_struct + "\"" for s in structs]))
+
+    includes.extend(common_includes)
+    class_name = file_prefix + "class"
+    shared_type = file_prefix + "struct"
     shared_instance = "p_" + shared_type
-    get_read = file_prefix + "_{n}_read"
-    get_write = file_prefix + "_{n}_write"
-    post_write =  file_prefix + "_{n}_post"
+    get_read = file_prefix + "{n}_read"
+    get_write = file_prefix + "{n}_write"
+    post_write =  file_prefix + "{n}_post"
     g = shared_instance
 
     with CFile(filename, outputpath, indent) as f:
+
 
         if preamble_file:
             with open(preamble_file, "w") as preamble:
@@ -29,31 +35,57 @@ def create_files(outputpath, file_prefix, c_ext, h_ext, preamble_file, critical_
         for i in includes + ["<string.h>", "\""+h_name+"\"", "\""+thread_name+"\""]:
             f.write("#include {}\n".format(i))
 
-        for s in structs:
-            f.write("#include \"{}\"\n".format(s.header_which_defines_struct))
         f.write("\n")
 
 
-        f.add_code_line("{}* {}".format(shared_type, shared_instance))
 
-        with CCodeBlock("void {}_init(void)".format(file_prefix), base=f) as init:
+
+        if class_style:
+            with CCodeBlock("{class_name}::{class_name}(void * g_ptr, {file_prefix}threads_processes thread): \n".format(**locals())
+                            + indent + "{shared_instance}(({shared_type} *) g_ptr),\n".format(**locals())
+                            + indent + "m_thread(thread)", base=f) as constructor:
+                pass
+            class_prefix = "{class_name}::".format(**locals())
+            get_thread = "m_thread"
+        else:
+            f.add_code_line("{}* {}".format(shared_type, shared_instance))
+            class_prefix = ""
+
+
+
+        with CCodeBlock("void {class_prefix}{file_prefix}init(void)".format(**locals()), base=f) as init:
             for s in structs:
                 t = s.type
                 n = s.name
-                init.add_code_line(("{t}* p_{n} = " + get_write +"()" ).format(**locals()))
-                #init.add_code_line(("*p_{n} = {t}{{0}}").format(**locals()))  #todo might need
-                init.add_code_line("memset(p_{n},0,sizeof({t}))".format(**locals()))
 
-                init.add_code_line((post_write+ "()").format(**locals()))
+
+                top_range = max(s.instance_count,1)
+                init.add_code_line("{t}* p_{n}".format(**locals()))
+
+                for i in range(0,top_range):
+                    if s.instance_count:
+                       inst = "{i}".format(**locals())
+                    else:
+                        inst = ""
+                    init.add_code_line(("p_{n} = " + get_write +"({inst})" ).format(**locals()))
+                    #init.add_code_line(("*p_{n} = {t}{{0}}").format(**locals()))  #todo might need
+                    init.add_code_line("memset(p_{n},0,sizeof({t}))".format(**locals()))
+                    init.add_code_line((post_write+ "({inst})").format(**locals()))
 
         for s in structs:
             t = s.type
             n = s.name
+            if s.instance_count:
+                inst_type = "uint8_t instance"
+                inst = "[instance]"
+            else:
+                inst_type = "void"
+                inst = ""
 
 
-            with CCodeBlock(("{t}* "+get_write+ "(void)").format(**locals()), base=f) as write_func:
+            with CCodeBlock(("{t}* {class_prefix}"+get_write+ "({inst_type})").format(**locals()), base=f) as write_func:
                 if len(s.all_copies) == 1:
-                    write_func.add_code_line("{g}->{n}_write = 0u".format(**locals()))
+                    write_func.add_code_line("{g}->{n}_write{inst} = 0u".format(**locals()))
                 else:
                     write_func.add_code_line(critical_enter)
                     for i in range(0, len(s.all_copies)):
@@ -69,43 +101,43 @@ def create_files(outputpath, file_prefix, c_ext, h_ext, preamble_file, critical_
                                 else:
                                     code_block += " && "
                                 copy = s.read_copies[j]
-                                code_block += "({i}u != {g}->{n}_{copy})".format(**locals())
+                                code_block += "({i}u != {g}->{n}_{copy}{inst})".format(**locals())
                             code_block+=")"
                         else:
                             code_block = "else"
                         with CCodeBlock(code_block, base=write_func) as write_if:
-                            write_if.add_code_line("{g}->{n}_write = {i}u".format(**locals()))
+                            write_if.add_code_line("{g}->{n}_write{inst} = {i}u".format(**locals()))
                     write_func.add_code_line(critical_exit)
                     write_func.add_code_line(
-                        "memcpy(&({g}->{n}_arr[{g}->{n}_write]), &({g}->{n}_arr[{g}->{n}_newest]), sizeof({t}))"
+                        "memcpy(&({g}->{n}_arr[{g}->{n}_write{inst}]{inst}), &({g}->{n}_arr[{g}->{n}_newest{inst}]{inst}), sizeof({t}))"
                             .format(**locals()))
 
-                write_func.add_code_line("return &({g}->{n}_arr[{g}->{n}_write])".format(**locals()))
+                write_func.add_code_line("return &({g}->{n}_arr[{g}->{n}_write{inst}]{inst})".format(**locals()))
 
-            with CCodeBlock(("void "+post_write+ "(void)").format(**locals()), base=f) as post_func:
+            with CCodeBlock(("void {class_prefix}"+post_write+ "({inst_type})").format(**locals()), base=f) as post_func:
                 post_func.add_code_line(critical_enter)
-                post_func.add_code_line("{g}->{n}_newest={g}->{n}_write".format(**locals()))
+                post_func.add_code_line("{g}->{n}_newest{inst}={g}->{n}_write{inst}".format(**locals()))
                 post_func.add_code_line(critical_exit)
 
-            with CCodeBlock(("{t}* "+get_read+ "(void)").format(**locals()), base=f) as read_func:
+            with CCodeBlock(("{t}* {class_prefix}"+get_read+ "({inst_type})").format(**locals()), base=f) as read_func:
                 read_func.add_code_line("{t}* rc".format(**locals()))
                 read_func.add_code_line(critical_enter)
 
                 with CCodeBlock("switch({})".format(get_thread),base = read_func) as switch:
                     for thread in [thr.name for thr in threads if thr.name in s.read_copies]:
-                        with CCodeBlock("case {}:".format(thread), base = switch) as case:
-                            case.add_code_line("{g}->{n}_{thread} = {g}->{n}_newest".format(**locals()))
-                            case.add_code_line("rc = &({g}->{n}_arr[{g}->{n}_{thread}])".format(**locals()))
+                        with CCodeBlock("case {}{}:".format(file_prefix,thread), base = switch) as case:
+                            case.add_code_line("{g}->{n}_{thread}{inst} = {g}->{n}_newest{inst}".format(**locals()))
+                            case.add_code_line("rc = &({g}->{n}_arr[{g}->{n}_{thread}{inst}]{inst})".format(**locals()))
                             case.add_code_line("break")
 
                     with CCodeBlock("default:", base=switch) as case:
-                            case.add_code_line("rc = &({g}->{n}_arr[{g}->{n}_newest])".format(**locals()))
+                            case.add_code_line("rc = &({g}->{n}_arr[{g}->{n}_newest{inst}]{inst})".format(**locals()))
                             case.add_code_line("break")
 
                 read_func.add_code_line(critical_exit)
                 read_func.add_code_line("return rc")
 
-    filename = file_prefix + "_shared_file" +  h_ext
+    filename = file_prefix + "shared_file" +  h_ext
 
     with CFile(h_name, outputpath, indent) as f:
 
@@ -116,10 +148,8 @@ def create_files(outputpath, file_prefix, c_ext, h_ext, preamble_file, critical_
         f.write("#ifndef __{0}__\n#define __{0}__\n".format(h_name.replace(".","_").upper()))
 
 
-        for i in includes + ["\""+thread_name+"\""]:
+        for i in common_includes + ["\""+thread_name+"\""]:
             f.write("#include {}\n".format(i))
-        for s in structs:
-            f.write("#include \"{}\"\n".format(s.header_which_defines_struct))
 
         f.write("\n")
 
@@ -128,23 +158,44 @@ def create_files(outputpath, file_prefix, c_ext, h_ext, preamble_file, critical_
             c_struct.add_code_line("uint8_t sem2")
 
             for s in structs:
+                if s.instance_count:
+                    inst = "[{}u]".format(s.instance_count)
+                else:
+                    inst = ""
+
                 t = s.type
                 n = s.name
                 for i in s.all_ptrs:
-                    c_struct.add_code_line("uint8_t {n}_{i}".format(**locals()))
+                    c_struct.add_code_line("uint8_t {n}_{i}{inst}".format(**locals()))
                 s = len(s.all_copies)
-                c_struct.add_code_line("{t} {n}_arr[{s}u]".format(**locals()))
+                c_struct.add_code_line("{t} {n}_arr[{s}u]{inst}".format(**locals()))
+
+        if class_style:
+            f.write("class {class_name}".format(**locals()))
+            f.write("{\n")
+            f.write("public:\n")
+            f.add_code_line("{class_name}(void * g_ptr, {file_prefix}threads_processes thread)".format(**locals()))
 
 
 
-        f.add_code_line("void {}_init(void)".format(file_prefix))
+        f.add_code_line("void {}init(void)".format(file_prefix))
 
         for s in structs:
+            if s.instance_count:
+                inst_type = "uint8_t instance"
+            else:
+                inst_type = "void"
             t = s.type
             n = s.name
-            f.add_code_line(("{t}* "+get_write+ "(void)").format(**locals()))
-            f.add_code_line(("void "+post_write+ "(void)").format(**locals()))
-            f.add_code_line(("{t}* "+get_read+ "(void)").format(**locals()))
+            f.add_code_line(("{t}* "+get_write+ "({inst_type})").format(**locals()))
+            f.add_code_line(("void "+post_write+ "({inst_type})").format(**locals()))
+            f.add_code_line(("{t}* "+get_read+ "({inst_type})").format(**locals()))
+
+        if class_style:
+            f.write("private:")
+            f.add_code_line("{shared_type} * {shared_instance}".format(**locals()))
+            f.add_code_line ("{file_prefix}threads_processes m_thread".format(**locals()))
+            f.add_code_line("}\n")
 
         f.write("#endif\n")
 
@@ -155,14 +206,11 @@ def create_files(outputpath, file_prefix, c_ext, h_ext, preamble_file, critical_
 
         f.write("#ifndef __{0}__\n#define __{0}__\n".format(thread_name.replace(".","_").upper()))
 
-        for i in includes:
-            f.write("#include {}\n".format(i))
-
-        with CCodeBlock("typedef enum", base=f, block_segmenter=('{', '} '+file_prefix + "_threads_processes" + ";")) \
+        with CCodeBlock("typedef enum", base=f, block_segmenter=('{', '} '+file_prefix + "threads_processes" + ";")) \
                 as c_enum:
-
+            c_enum.add_code_line("INVALID",termination=",")
             for i in range(0,len(threads)):
-                c_enum.add_code_line(threads[i].name,termination = "," if i<len(threads)-1 else "")
+                c_enum.add_code_line(file_prefix+threads[i].name,termination = "," if i<len(threads)-1 else "")
 
 
         f.write("#endif\n")

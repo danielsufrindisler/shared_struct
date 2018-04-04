@@ -51,7 +51,7 @@ class thread:
 
 
 class struct:
-    def __init__(self, name, type, header, parsing, read_copies, read_threads, all_copies, all_ptrs):
+    def __init__(self, name, type, header, parsing, read_copies, read_threads, all_copies, all_ptrs, num_instances):
         """
         :str name: name of the thread or process
         :bool exempt: true if this thread is exempt from critical sections / mutexes
@@ -68,6 +68,7 @@ class struct:
         self.read_threads = read_threads
         self.all_copies = all_copies
         self.all_ptrs = all_ptrs
+        self.instance_count = num_instances
 
 
 
@@ -114,11 +115,11 @@ def main(name):
 
 
         s_objs.append( struct(s["name"], s["type"], s["header"], False, s["read_copies"], s["read_threads"],
-                              s["all_copies"], s["index_names"]))
+                              s["all_copies"], s["index_names"], s.get("num_instances",0)))
 
     generate_struct.create_files(sf["output_path"], sf["prefix"], sf["c_extension"], sf["h_extension"], \
                                  sf["preamble"], sf["critical_enter"], sf["critical_exit"], sf["includes"], \
-                                 json_struct["threads"]["get_thread_function"],threads, s_objs)
+                                 json_struct["threads"]["get_thread_function"],threads, s_objs, sf["cppclasses"])
     print "files created successfully"
     return 0
 

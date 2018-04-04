@@ -9,13 +9,14 @@ threads:
     threads: [background2]
   get_thread_function: get_thread()
 share_files:
+  style: class
   output_path: ./c_files/output #directory relative to current working directory (or absolute path)
   preamble: null #this is a filepath to a text file which can contain copyright for the created file.
   h_extension: .h  #.h or .hpp
   c_extension: .c  #.c or .cpp
   prefix: shs  #default is shs, all functions will start with this prefix, and all files created will as well
-  critical_enter: sem_get(&(p_shs_struct->sem))  # a function that can protect the critical sections.  On embedded disabling and enabling interrupts is often much lower overhead.
-  critical_exit: sem_release(&(p_shs_struct->sem))
+  critical_enter: sem_get(&(p_shtst_struct->sem))  # a function that can protect the critical sections.  On embedded disabling and enabling interrupts is often much lower overhead.
+  critical_exit: sem_release(&(p_shtst_struct->sem))
   includes: ['"main.h"', '"linux_ipc.h"']  #what to include where critical_enter and critical_exit will be defined.
   structs:
   - header: tstest.h    #header file which defines the struct
